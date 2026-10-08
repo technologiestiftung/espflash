@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `panic-backtrace` feature (enabled by default); without it, `miette` is built without backtrace support and panics use the standard Rust panic message
 - `pretty-logs` feature (enabled by default); without it, log output is plain (no colors or timestamps) and `RUST_LOG` filters are matched as substrings instead of regular expressions
 - `completions` feature (enabled by default) to allow building the CLI without the `completions` subcommand and `clap_complete`
+- `pretty-errors` feature (enabled by default); without it, errors are printed in `miette`'s plain narratable format instead of graphical reports
 
 ### Changed
 - Batching write for serial monitor input, to speed up text pasting, with writes timeout warning

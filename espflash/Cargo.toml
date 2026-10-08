@@ -69,7 +69,7 @@ libc = "0.2.174"
 nix = { version = "0.31", features = ["signal", "time"] }
 
 [features]
-default = ["bundled-resources", "cli", "completions", "monitor", "panic-backtrace", "pretty-logs", "rom-elfs", "update-check"]
+default = ["bundled-resources", "cli", "completions", "monitor", "panic-backtrace", "pretty-errors", "pretty-logs", "rom-elfs", "update-check"]
 cli = [
     "dep:clap",
     "dep:comfy-table",
@@ -79,7 +79,6 @@ cli = [
     "dep:directories",
     "dep:env_logger",
     "dep:indicatif",
-    "miette/fancy-no-backtrace",
     "serialport",
 ]
 
@@ -93,7 +92,11 @@ monitor = ["cli", "dep:addr2line", "dep:defmt-decoder", "dep:regex"]
 pretty-logs = ["cli", "env_logger/default"]
 
 # Includes a backtrace in panic reports
-panic-backtrace = ["cli", "miette/fancy"]
+panic-backtrace = ["pretty-errors", "miette/fancy"]
+
+# Graphical error reports; without it, errors are printed in miette's plain
+# narratable format
+pretty-errors = ["cli", "miette/fancy-no-backtrace"]
 
 # Embeds the default bootloaders and flasher stubs; without it they are
 # loaded from the directory named by `ESPFLASH_RESOURCE_DIR`

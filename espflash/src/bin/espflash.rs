@@ -168,6 +168,8 @@ struct SaveImageArgs {
 fn main() -> Result<()> {
     #[cfg(feature = "panic-backtrace")]
     miette::set_panic_hook();
+    #[cfg(not(feature = "pretty-errors"))]
+    miette::set_hook(Box::new(|_| Box::new(miette::NarratableReportHandler::new())))?;
     initialize_logger(LevelFilter::Info);
 
     // Attempt to parse any provided command-line arguments, or print the help
