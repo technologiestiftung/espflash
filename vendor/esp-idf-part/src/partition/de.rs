@@ -1,7 +1,6 @@
 use std::str::FromStr;
 
 use deku::DekuRead;
-use regex::Regex;
 use serde::{Deserialize, Deserializer, de::Error};
 
 use super::{
@@ -207,28 +206,33 @@ fn deserialize_partition_offset_or_size<'de, D>(deserializer: D) -> Result<Optio
 where
     D: Deserializer<'de>,
 {
-    // Begins with one or more digits, optionally followed by a single 'k' or 'm'
-    // character (case-insenstive, exclusive or)
-    let re = Regex::new(r"(?i)^(\d+)([km]{1})$").unwrap();
-
     let buf = String::deserialize(deserializer)?;
     if buf.is_empty() {
         Ok(None)
     } else if let Ok(integer) = parse_int::parse::<u32>(&buf) {
         Ok(Some(integer))
-    } else if let Some(captures) = re.captures(&buf) {
-        // Size multiplier format (1k, 2M, etc.)
-        let digits = captures.get(1).unwrap().as_str().parse::<u32>().unwrap();
-        let multiplier = match captures.get(2).unwrap().as_str() {
-            "k" | "K" => 1024,
-            "m" | "M" => 1024 * 1024,
-            _ => unreachable!(),
-        };
-
-        Ok(Some(digits * multiplier))
+    } else if let Some(size) = parse_size_with_multiplier(&buf) {
+        Ok(Some(size))
     } else {
         Err(Error::custom("invalid partition size/offset format"))
     }
+}
+
+/// Parses one or more digits followed by a single 'k' or 'm' character
+/// (case-insensitive), e.g. `1k` or `2M`.
+fn parse_size_with_multiplier(buf: &str) -> Option<u32> {
+    let (digits, multiplier) = if let Some(digits) = buf.strip_suffix(['k', 'K']) {
+        (digits, 1024)
+    } else if let Some(digits) = buf.strip_suffix(['m', 'M']) {
+        (digits, 1024 * 1024)
+    } else {
+        return None;
+    };
+    if digits.is_empty() || !digits.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+
+    digits.parse::<u32>().ok()?.checked_mul(multiplier)
 }
 
 #[cfg(test)]
@@ -355,5 +359,22 @@ mod tests {
         // Offsets can optionally be omitted in some cases
         let deserializer: StrDeserializer<ValueError> = "".into_deserializer();
         assert_eq!(deserialize_partition_offset_or_size(deserializer), Ok(None));
+
+        let deserializer: StrDeserializer<ValueError> = "4kb".into_deserializer();
+        assert!(deserialize_partition_offset_or_size(deserializer).is_err());
+    }
+
+    #[test]
+    fn test_parse_size_with_multiplier() {
+        assert_eq!(parse_size_with_multiplier("4k"), Some(4 * 1024));
+        assert_eq!(parse_size_with_multiplier("4K"), Some(4 * 1024));
+        assert_eq!(parse_size_with_multiplier("16m"), Some(16 * 1024 * 1024));
+        assert_eq!(parse_size_with_multiplier("4095M"), Some(4095 * 1024 * 1024));
+
+        for invalid in [
+            "", "k", "4", "4kb", "4 k", "-4k", "+4k", "4\u{e4}", "\u{663}k", "4096M",
+        ] {
+            assert_eq!(parse_size_with_multiplier(invalid), None, "{invalid:?}");
+        }
     }
 }
