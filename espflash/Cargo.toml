@@ -33,7 +33,7 @@ addr2line       = { version = "0.25", optional = true }
 base64          = "0.22"
 bitflags        = "2.9"
 bytemuck        = { version = "1.23", features = ["derive"] }
-clap            = { version = "4.5", features = ["derive", "env", "wrap_help"], optional = true }
+clap            = { version = "4.5", default-features = false, features = ["derive", "env", "error-context", "help", "std", "usage"], optional = true }
 clap_complete   = { version = "4.5", optional = true }
 comfy-table     = { version = "7.1", optional = true }
 crossterm       = { version = "0.29", optional = true }
@@ -69,7 +69,7 @@ libc = "0.2.174"
 nix = { version = "0.31", features = ["signal", "time"] }
 
 [features]
-default = ["bundled-resources", "cli", "completions", "monitor", "panic-backtrace", "pretty-errors", "pretty-logs", "rom-elfs", "update-check"]
+default = ["bundled-resources", "cli", "completions", "monitor", "panic-backtrace", "pretty-errors", "pretty-help", "pretty-logs", "rom-elfs", "update-check"]
 cli = [
     "dep:clap",
     "dep:comfy-table",
@@ -87,6 +87,9 @@ completions = ["cli", "dep:clap_complete"]
 
 # Serial monitor, including backtrace and defmt decoding
 monitor = ["cli", "dep:addr2line", "dep:defmt-decoder", "dep:regex"]
+
+# Colored and wrapped `--help` output, suggestions for mistyped arguments
+pretty-help = ["cli", "clap/color", "clap/suggestions", "clap/wrap_help"]
 
 # Colored and timestamped log output, regular expressions in `RUST_LOG`
 pretty-logs = ["cli", "env_logger/default"]
