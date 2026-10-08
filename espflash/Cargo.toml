@@ -85,7 +85,7 @@ cli = [
 ]
 
 # Serial monitor, including backtrace and defmt decoding
-monitor = ["cli", "dep:addr2line", "dep:defmt-decoder"]
+monitor = ["cli", "dep:addr2line", "dep:defmt-decoder", "dep:regex"]
 
 # Includes a backtrace in panic reports
 panic-backtrace = ["cli", "miette/fancy"]
@@ -101,4 +101,4 @@ rom-elfs = []
 update-check = ["cli", "dep:update-informer"]
 
 # Enables connecting to a device via serial port
-serialport = ["dep:reed-solomon", "dep:regex", "dep:serialport", "dep:slip-codec", "dep:toml"]
+serialport = ["dep:reed-solomon", "dep:serialport", "dep:slip-codec", "dep:toml"]

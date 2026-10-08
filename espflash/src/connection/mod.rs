@@ -14,7 +14,6 @@ use std::{
 };
 
 use log::{debug, info};
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serialport::{SerialPort, UsbPortInfo};
 use slip_codec::SlipDecoder;
@@ -317,19 +316,12 @@ impl Connection {
 
             let read_slice = String::from_utf8_lossy(&buff[..read_bytes as usize]).into_owned();
 
-            let pattern =
-                Regex::new(r"boot:(0x[0-9a-fA-F]+)([\s\S]*waiting for download)?").unwrap();
-
-            // Search for the pattern in the read data
-            if let Some(data) = pattern.captures(&read_slice) {
+            // Search for the boot log in the read data
+            if let Some((mode, download)) = parse_boot_log(&read_slice) {
                 boot_log_detected = true;
                 // Boot log detected
-                boot_mode = data
-                    .get(1)
-                    .map(|m| m.as_str())
-                    .unwrap_or_default()
-                    .to_string();
-                download_mode = data.get(2).is_some();
+                boot_mode = mode.to_string();
+                download_mode = download;
 
                 // Further processing or printing the results
                 debug!("Boot Mode: {boot_mode}");
@@ -816,6 +808,26 @@ impl Connection {
     }
 }
 
+/// Finds the boot mode in a ROM boot log, e.g. `boot:0x8 (DOWNLOAD...)`.
+///
+/// Returns the boot mode (`0x...`) and whether the log says that the chip is
+/// waiting for download.
+fn parse_boot_log(log: &str) -> Option<(&str, bool)> {
+    log.match_indices("boot:0x").find_map(|(start, _)| {
+        let mode_start = start + "boot:".len();
+        let digits = log[mode_start + 2..]
+            .find(|c: char| !c.is_ascii_hexdigit())
+            .unwrap_or(log.len() - mode_start - 2);
+        if digits == 0 {
+            return None;
+        }
+
+        let mode_end = mode_start + 2 + digits;
+        let download = log[mode_end..].contains("waiting for download");
+        Some((&log[mode_start..mode_end], download))
+    })
+}
+
 impl From<Connection> for Port {
     fn from(conn: Connection) -> Self {
         conn.into_serial()
@@ -878,5 +890,25 @@ mod encoder {
         fn flush(&mut self) -> std::io::Result<()> {
             self.writer.flush()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_boot_log;
+
+    #[test]
+    fn boot_log() {
+        let log = "ESP-ROM:esp32s3-20210327\r\nrst:0x1 (POWERON),boot:0x0 (DOWNLOAD(USB/UART0))\r\nwaiting for download\r\n";
+        assert_eq!(parse_boot_log(log), Some(("0x0", true)));
+
+        let log = "rst:0x1 (POWERON),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\n";
+        assert_eq!(parse_boot_log(log), Some(("0x8", false)));
+
+        let log = "boot:0xZ boot:0x2b (SPI_FAST_FLASH_BOOT)";
+        assert_eq!(parse_boot_log(log), Some(("0x2b", false)));
+
+        assert_eq!(parse_boot_log("boot:0x"), None);
+        assert_eq!(parse_boot_log("no boot log"), None);
     }
 }
