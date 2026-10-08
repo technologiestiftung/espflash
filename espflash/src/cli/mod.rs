@@ -23,6 +23,7 @@ use std::{
 };
 
 use clap::{Args, ValueEnum};
+#[cfg(feature = "completions")]
 use clap_complete::Shell;
 use comfy_table::{Attribute, Cell, Color, Table, modifiers, presets::UTF8_FULL};
 use config::PortConfig;
@@ -102,6 +103,7 @@ pub struct ConnectArgs {
 }
 
 /// Generate completions for the given shell
+#[cfg(feature = "completions")]
 #[derive(Debug, Args)]
 #[non_exhaustive]
 pub struct CompletionsArgs {
@@ -600,6 +602,7 @@ pub fn list_ports(args: &ListPortsArgs, config: &PortConfig) -> Result<()> {
 }
 
 /// Generate shell completions for the given shell
+#[cfg(feature = "completions")]
 pub fn completions(args: &CompletionsArgs, app: &mut clap::Command, bin_name: &str) -> Result<()> {
     clap_complete::generate(args.shell, app, bin_name, &mut std::io::stdout());
 

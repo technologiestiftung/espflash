@@ -1,6 +1,8 @@
 use std::{fs, path::PathBuf};
 
-use clap::{Args, CommandFactory, Parser, Subcommand};
+#[cfg(feature = "completions")]
+use clap::CommandFactory;
+use clap::{Args, Parser, Subcommand};
 #[cfg(feature = "monitor")]
 use espflash::cli::monitor::{check_monitor_args, monitor};
 use espflash::{
@@ -47,6 +49,7 @@ enum Commands {
     /// The directory in which completion scripts are stored differs
     /// depending on which shell is being used; consult your shell's
     /// documentation to determine the appropriate path.
+    #[cfg(feature = "completions")]
     Completions(CompletionsArgs),
     /// Erase Flash entirely
     EraseFlash(EraseFlashArgs),
@@ -188,6 +191,7 @@ fn main() -> Result<()> {
     match args {
         Commands::BoardInfo(args) => board_info(&args, &config),
         Commands::ChecksumMd5(args) => checksum_md5(&args, &config),
+        #[cfg(feature = "completions")]
         Commands::Completions(args) => completions(&args, &mut Cli::command(), "espflash"),
         Commands::EraseFlash(args) => erase_flash(args, &config),
         Commands::EraseParts(args) => erase_parts(args, &config),
