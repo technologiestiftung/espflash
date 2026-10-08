@@ -963,8 +963,6 @@ dependencies = [
 [[package]]
 name = "esp-idf-part"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5ebc2381d030e4e89183554c3fcd4ad44dc5ab34961ab09e09b4adbe4f94b61"
 dependencies = [
  "bitflags 2.13.2",
  "csv",

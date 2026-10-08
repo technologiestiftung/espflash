@@ -1,7 +1,12 @@
 [workspace]
 resolver = "2"
 members  = ["cargo-espflash", "espflash", "xtask"]
+exclude  = ["vendor"]
 
 [profile.release]
 lto   = "thin"
 strip = true
+
+[patch.crates-io]
+# esp-idf-part 0.6.0 without the `regex` dependency
+esp-idf-part = { path = "vendor/esp-idf-part" }
