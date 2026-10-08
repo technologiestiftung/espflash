@@ -461,6 +461,13 @@ pub struct DeviceInfo {
 
 impl DeviceInfo {
     #[doc(hidden)]
+    #[cfg(not(feature = "rom-elfs"))]
+    pub fn rom(&self) -> Option<Vec<u8>> {
+        None
+    }
+
+    #[doc(hidden)]
+    #[cfg(feature = "rom-elfs")]
     pub fn rom(&self) -> Option<Vec<u8>> {
         match self.chip {
             Chip::Esp32 => {

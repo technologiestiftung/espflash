@@ -69,7 +69,7 @@ libc = "0.2.174"
 nix = { version = "0.31", features = ["signal", "time"] }
 
 [features]
-default = ["cli", "update-check"]
+default = ["cli", "rom-elfs", "update-check"]
 cli = [
     "dep:addr2line",
     "dep:clap",
@@ -85,6 +85,9 @@ cli = [
     "miette/fancy",
     "serialport",
 ]
+
+# Embeds ROM ELFs used to symbolize ROM addresses in the serial monitor
+rom-elfs = []
 
 # Checks crates.io for newer versions on startup
 update-check = ["cli", "dep:update-informer"]
