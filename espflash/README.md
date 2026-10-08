@@ -24,6 +24,7 @@ Supports the **ESP32**, **ESP32-C2/C3/C5/C6/C61**, **ESP32-H2/H4**, **ESP32-P4**
   - [`espflash.toml`](#espflashtoml)
   - [Configuration Files Location](#configuration-files-location)
   - [Configuration Precedence](#configuration-precedence)
+- [Bootloader and Flasher Stub Resources](#bootloader-and-flasher-stub-resources)
 - [Logging Format](#logging-format)
 - [Development Kit Support Policy](#development-kit-support-policy)
 - [License](#license)
@@ -197,6 +198,15 @@ You can have a local and/or a global configuration file(s):
 1. Environment variables: If `ESPFLASH_PORT`, `MONITOR_BAUD` or `ESPFLASH_BAUD` are set, the will be used instead of the config file value.
 2. Local configuration file
 3. Global configuration file
+
+## Bootloader and Flasher Stub Resources
+
+By default, the ESP-IDF bootloaders and flasher stubs for all supported chips are bundled into `espflash`. They can also be loaded from a resource directory with the same layout as [`resources/`](./resources/), i.e. `bootloaders/<name>-bootloader.bin` and `stubs/<chip>.toml`. The directory is named by the `ESPFLASH_RESOURCE_DIR` environment variable, either at runtime or at build time. Files found there take precedence over bundled ones.
+
+When building without the `bundled-resources` feature (e.g. for size-constrained systems), only the resource directory is used:
+
+- If no bootloader is found, `flash` and `save-image` require `--bootloader`.
+- If no flasher stub is found, `espflash` falls back to the ROM loader, which is slower and cannot erase flash. A stub can also be given with `--stub <FILE>`.
 
 ## Logging Format
 

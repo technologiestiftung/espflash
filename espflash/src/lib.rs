@@ -37,6 +37,7 @@ pub mod command;
 pub mod connection;
 pub mod flasher;
 pub mod image_format;
+pub mod resources;
 pub mod target;
 
 mod error;

@@ -166,9 +166,26 @@ pub enum Error {
     #[error("This command requires using the RAM stub")]
     #[diagnostic(
         code(espflash::stub_required),
-        help("Don't use the `--no-stub` option with the command")
+        help(
+            "Don't use the `--no-stub` option with the command, and make sure a flasher stub is available (bundled, via `--stub`, or in the `stubs` subdirectory of the directory named by `ESPFLASH_RESOURCE_DIR`)"
+        )
     )]
     StubRequired,
+
+    /// The flasher stub could not be parsed
+    #[error("Invalid flasher stub: {0}")]
+    #[diagnostic(code(espflash::invalid_stub))]
+    InvalidStub(String),
+
+    /// No default bootloader is available for the target
+    #[error("Bootloader `{0}` is neither bundled nor in the resource directory")]
+    #[diagnostic(
+        code(espflash::missing_bootloader),
+        help(
+            "Use the `--bootloader` option, or place the file in the `bootloaders` subdirectory of the directory named by `ESPFLASH_RESOURCE_DIR`"
+        )
+    )]
+    MissingBootloader(String),
 
     /// Serial port could not be found
     #[error("The serial port '{0}' could not be found")]

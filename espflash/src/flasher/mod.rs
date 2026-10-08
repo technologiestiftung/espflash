@@ -40,10 +40,12 @@ use crate::{
         CHIP_DETECT_MAGIC_REG_ADDR,
         DEFAULT_TIMEOUT,
         EXPECTED_STUB_HANDSHAKE,
-        FlashStub,
     },
     image_format::{ImageFormat, Segment, ram_segments, rom_segments},
 };
+
+#[cfg(feature = "serialport")]
+pub use self::stubs::FlashStub;
 
 #[cfg(feature = "serialport")]
 pub(crate) mod stubs;
@@ -578,10 +580,41 @@ impl Flasher {
         Self::try_connect(connection, use_stub, verify, skip, chip, baud).map_err(|e| e.0)
     }
 
+    /// Like [Flasher::connect], but uses the given flash stub instead of
+    /// looking one up. See [Flasher::try_connect_with_stub].
+    pub fn connect_with_stub(
+        connection: Connection,
+        stub: Option<FlashStub>,
+        use_stub: bool,
+        verify: bool,
+        skip: bool,
+        chip: Option<Chip>,
+        baud: Option<u32>,
+    ) -> Result<Self, Error> {
+        Self::try_connect_with_stub(connection, stub, use_stub, verify, skip, chip, baud)
+            .map_err(|e| e.0)
+    }
+
     /// Attempt to connect to the boot rom. If an error is encountered,
     /// return the error along with the [Connection] that was passed in.
     pub fn try_connect(
+        connection: Connection,
+        use_stub: bool,
+        verify: bool,
+        skip: bool,
+        chip: Option<Chip>,
+        baud: Option<u32>,
+    ) -> Result<Self, Box<(Error, Connection)>> {
+        Self::try_connect_with_stub(connection, None, use_stub, verify, skip, chip, baud)
+    }
+
+    /// Attempt to connect to the boot rom, using the given flash stub. If
+    /// `stub` is `None`, the stub is looked up with [FlashStub::find]; if none
+    /// is found, the ROM loader is used instead. If an error is encountered,
+    /// return the error along with the [Connection] that was passed in.
+    pub fn try_connect_with_stub(
         mut connection: Connection,
+        stub: Option<FlashStub>,
         use_stub: bool,
         verify: bool,
         skip: bool,
@@ -660,9 +693,25 @@ impl Flasher {
 
             // Load flash stub if enabled.
             if use_stub {
-                info!("Using flash stub");
-                if let Err(e) = flasher.load_stub() {
-                    return Err(Box::new((e, flasher.into_connection())));
+                let stub = match stub {
+                    Some(stub) => Ok(Some(stub)),
+                    None => flasher.find_stub(),
+                };
+                match stub {
+                    Ok(Some(stub)) => {
+                        info!("Using flash stub");
+                        if let Err(e) = flasher.load_stub(&stub) {
+                            return Err(Box::new((e, flasher.into_connection())));
+                        }
+                    }
+                    Ok(None) => {
+                        warn!(
+                            "No flash stub available for {}, using the ROM loader",
+                            flasher.chip
+                        );
+                        flasher.use_stub = false;
+                    }
+                    Err(e) => return Err(Box::new((e, flasher.into_connection()))),
                 }
             }
             // Flash size autodetection doesn't work in Secure Download Mode.
@@ -808,9 +857,7 @@ impl Flasher {
         Ok(())
     }
 
-    fn load_stub(&mut self) -> Result<(), Error> {
-        debug!("Loading flash stub for chip: {:?}", self.chip);
-
+    fn find_stub(&mut self) -> Result<Option<FlashStub>, Error> {
         // Get chip revision for ESP32-P4 (needed to select correct stub)
         let revision = if matches!(self.chip, Chip::Esp32p4) {
             match self.chip_revision() {
@@ -831,8 +878,11 @@ impl Flasher {
             None
         };
 
-        // Load flash stub
-        let stub = FlashStub::get_with_rev(self.chip, revision);
+        FlashStub::find(self.chip, revision)
+    }
+
+    fn load_stub(&mut self, stub: &FlashStub) -> Result<(), Error> {
+        debug!("Loading flash stub for chip: {:?}", self.chip);
 
         let mut ram_target = self
             .chip
@@ -1076,6 +1126,11 @@ impl Flasher {
         self.connection.secure_download_mode
     }
 
+    /// Whether the flash stub is in use (as opposed to the ROM loader).
+    pub fn uses_stub(&self) -> bool {
+        self.use_stub
+    }
+
     /// Read and print any information we can about the connected device
     pub fn device_info(&mut self) -> Result<DeviceInfo, Error> {
         let chip = self.chip();
@@ -1303,6 +1358,9 @@ impl Flasher {
 
     /// Erase a region of flash.
     pub fn erase_region(&mut self, offset: u32, size: u32) -> Result<(), Error> {
+        if !self.use_stub {
+            return Err(Error::StubRequired);
+        }
         debug!("Erasing region of 0x{size:x}B at 0x{offset:08x}");
 
         self.connection.with_timeout(
@@ -1316,6 +1374,9 @@ impl Flasher {
 
     /// Erase entire flash.
     pub fn erase_flash(&mut self) -> Result<(), Error> {
+        if !self.use_stub {
+            return Err(Error::StubRequired);
+        }
         debug!("Erasing the entire flash");
 
         self.connection

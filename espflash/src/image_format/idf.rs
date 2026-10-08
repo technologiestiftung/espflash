@@ -31,6 +31,7 @@ use crate::{
     Error,
     error::AppDescriptorError,
     flasher::{FlashData, FlashFrequency, FlashMode, FlashSize},
+    resources::{self, ResourceKind},
     target::{Chip, XtalFrequency},
 };
 
@@ -43,46 +44,28 @@ const WP_PIN_DISABLED: u8 = 0xEE;
 /// Max partition size is 16 MB
 const MAX_PARTITION_SIZE: u32 = 16 * 1000 * 1024;
 
-const BOOTLOADER_ESP32_26MHZ: &[u8] =
-    include_bytes!("../../resources/bootloaders/esp32_26-bootloader.bin");
-const BOOTLOADER_ESP32_40MHZ: &[u8] =
-    include_bytes!("../../resources/bootloaders/esp32-bootloader.bin");
-
-const BOOTLOADER_ESP32C2_26MHZ: &[u8] =
-    include_bytes!("../../resources/bootloaders/esp32c2_26-bootloader.bin");
-const BOOTLOADER_ESP32C2_40MHZ: &[u8] =
-    include_bytes!("../../resources/bootloaders/esp32c2-bootloader.bin");
-
-const BOOTLOADER_ESP32C3: &[u8] =
-    include_bytes!("../../resources/bootloaders/esp32c3-bootloader.bin");
-const BOOTLOADER_ESP32C5: &[u8] =
-    include_bytes!("../../resources/bootloaders/esp32c5-bootloader.bin");
-const BOOTLOADER_ESP32C6: &[u8] =
-    include_bytes!("../../resources/bootloaders/esp32c6-bootloader.bin");
-const BOOTLOADER_ESP32C61: &[u8] =
-    include_bytes!("../../resources/bootloaders/esp32c61-bootloader.bin");
-const BOOTLOADER_ESP32H2: &[u8] =
-    include_bytes!("../../resources/bootloaders/esp32h2-bootloader.bin");
-const BOOTLOADER_ESP32H4: &[u8] =
-    include_bytes!("../../resources/bootloaders/esp32h4-bootloader.bin");
-const BOOTLOADER_ESP32P4_V0: &[u8] =
-    include_bytes!("../../resources/bootloaders/esp32p4-v0-bootloader.bin");
-const BOOTLOADER_ESP32P4_V3: &[u8] =
-    include_bytes!("../../resources/bootloaders/esp32p4-v3-bootloader.bin");
-const BOOTLOADER_ESP32S2: &[u8] =
-    include_bytes!("../../resources/bootloaders/esp32s2-bootloader.bin");
-const BOOTLOADER_ESP32S3: &[u8] =
-    include_bytes!("../../resources/bootloaders/esp32s3-bootloader.bin");
-const BOOTLOADER_ESP32S31: &[u8] =
-    include_bytes!("../../resources/bootloaders/esp32s31-bootloader.bin");
 /// Get the default bootloader for the given chip, crystal frequency, and
-/// chip revision.
+/// chip revision, from the resource directory or the bundled copies.
 pub(crate) fn default_bootloader(
     chip: Chip,
     xtal_freq: XtalFrequency,
     chip_revision: Option<u16>,
     min_chip_rev: u16,
-) -> Result<&'static [u8], Error> {
+) -> Result<Cow<'static, [u8]>, Error> {
+    let name = default_bootloader_name(chip, xtal_freq, chip_revision, min_chip_rev)?;
+
+    resources::load(ResourceKind::Bootloader, name)?
+        .ok_or_else(|| Error::MissingBootloader(name.to_string()))
+}
+
+/// Get the file name of the default bootloader for the given chip, crystal
+/// frequency, and chip revision.
+fn default_bootloader_name(
+    chip: Chip,
+    xtal_freq: XtalFrequency,
+    chip_revision: Option<u16>,
+    min_chip_rev: u16,
+) -> Result<&'static str, Error> {
     let error = Error::UnsupportedFeature {
         chip,
         feature: "the selected crystal frequency".into(),
@@ -90,37 +73,37 @@ pub(crate) fn default_bootloader(
 
     match chip {
         Chip::Esp32 => match xtal_freq {
-            XtalFrequency::_26Mhz => Ok(BOOTLOADER_ESP32_26MHZ),
-            XtalFrequency::_40Mhz => Ok(BOOTLOADER_ESP32_40MHZ),
+            XtalFrequency::_26Mhz => Ok("esp32_26-bootloader.bin"),
+            XtalFrequency::_40Mhz => Ok("esp32-bootloader.bin"),
             _ => Err(error),
         },
         Chip::Esp32c2 => match xtal_freq {
-            XtalFrequency::_26Mhz => Ok(BOOTLOADER_ESP32C2_26MHZ),
-            XtalFrequency::_40Mhz => Ok(BOOTLOADER_ESP32C2_40MHZ),
+            XtalFrequency::_26Mhz => Ok("esp32c2_26-bootloader.bin"),
+            XtalFrequency::_40Mhz => Ok("esp32c2-bootloader.bin"),
             _ => Err(error),
         },
         Chip::Esp32c3 => match xtal_freq {
-            XtalFrequency::_40Mhz => Ok(BOOTLOADER_ESP32C3),
+            XtalFrequency::_40Mhz => Ok("esp32c3-bootloader.bin"),
             _ => Err(error),
         },
         Chip::Esp32c5 => match xtal_freq {
-            XtalFrequency::_40Mhz | XtalFrequency::_48Mhz => Ok(BOOTLOADER_ESP32C5),
+            XtalFrequency::_40Mhz | XtalFrequency::_48Mhz => Ok("esp32c5-bootloader.bin"),
             _ => Err(error),
         },
         Chip::Esp32c6 => match xtal_freq {
-            XtalFrequency::_40Mhz => Ok(BOOTLOADER_ESP32C6),
+            XtalFrequency::_40Mhz => Ok("esp32c6-bootloader.bin"),
             _ => Err(error),
         },
         Chip::Esp32c61 => match xtal_freq {
-            XtalFrequency::_40Mhz => Ok(BOOTLOADER_ESP32C61),
+            XtalFrequency::_40Mhz => Ok("esp32c61-bootloader.bin"),
             _ => Err(error),
         },
         Chip::Esp32h2 => match xtal_freq {
-            XtalFrequency::_32Mhz => Ok(BOOTLOADER_ESP32H2),
+            XtalFrequency::_32Mhz => Ok("esp32h2-bootloader.bin"),
             _ => Err(error),
         },
         Chip::Esp32h4 => match xtal_freq {
-            XtalFrequency::_32Mhz => Ok(BOOTLOADER_ESP32H4),
+            XtalFrequency::_32Mhz => Ok("esp32h4-bootloader.bin"),
             _ => Err(error),
         },
         Chip::Esp32p4 => match xtal_freq {
@@ -128,23 +111,23 @@ pub(crate) fn default_bootloader(
                 let revision = chip_revision.unwrap_or(min_chip_rev);
 
                 if revision >= 300 {
-                    Ok(BOOTLOADER_ESP32P4_V3)
+                    Ok("esp32p4-v3-bootloader.bin")
                 } else {
-                    Ok(BOOTLOADER_ESP32P4_V0)
+                    Ok("esp32p4-v0-bootloader.bin")
                 }
             }
             _ => Err(error),
         },
         Chip::Esp32s2 => match xtal_freq {
-            XtalFrequency::_40Mhz => Ok(BOOTLOADER_ESP32S2),
+            XtalFrequency::_40Mhz => Ok("esp32s2-bootloader.bin"),
             _ => Err(error),
         },
         Chip::Esp32s3 => match xtal_freq {
-            XtalFrequency::_40Mhz => Ok(BOOTLOADER_ESP32S3),
+            XtalFrequency::_40Mhz => Ok("esp32s3-bootloader.bin"),
             _ => Err(error),
         },
         Chip::Esp32s31 => match xtal_freq {
-            XtalFrequency::_40Mhz => Ok(BOOTLOADER_ESP32S31),
+            XtalFrequency::_40Mhz => Ok("esp32s31-bootloader.bin"),
             _ => Err(error),
         },
     }
@@ -351,13 +334,12 @@ impl<'a> IdfBootloaderFormat<'a> {
             let bootloader = fs::read(bootloader_path)?;
             Cow::Owned(bootloader)
         } else {
-            let default_bootloader = default_bootloader(
+            default_bootloader(
                 flash_data.chip,
                 flash_data.xtal_freq,
                 chip_revision,
                 min_chip_rev,
-            )?;
-            Cow::Borrowed(default_bootloader)
+            )?
         };
 
         // fetch the generated header from the bootloader

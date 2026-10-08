@@ -50,6 +50,7 @@ use crate::{
         FlashMode,
         FlashSettings,
         FlashSize,
+        FlashStub,
         Flasher,
     },
     image_format::{ImageFormat, ImageFormatKind, Metadata, idf::IdfBootloaderFormat},
@@ -87,6 +88,10 @@ pub struct ConnectArgs {
     /// Do not use the RAM stub for loading
     #[arg(long)]
     pub no_stub: bool,
+    /// Flasher stub (TOML) to use instead of looking it up in the resource
+    /// directory or among the bundled stubs
+    #[arg(long, value_name = "FILE", conflicts_with = "no_stub")]
+    pub stub: Option<PathBuf>,
     /// Serial port connected to target device
     #[arg(short = 'p', long, env = "ESPFLASH_PORT")]
     pub port: Option<String>,
@@ -470,8 +475,11 @@ pub fn connect(
             .or(config.project_config.baudrate)
             .unwrap_or(115_200),
     );
-    Ok(Flasher::connect(
+    let stub = args.stub.as_deref().map(FlashStub::from_file).transpose()?;
+
+    Ok(Flasher::connect_with_stub(
         connection,
+        stub,
         !args.no_stub,
         !no_verify,
         !no_skip,
@@ -493,7 +501,8 @@ pub fn board_info(args: &ConnectArgs, config: &Config) -> Result<()> {
         println!("Security features: None");
     }
 
-    flasher.connection().reset_after(!args.no_stub, chip)?;
+    let is_stub = flasher.uses_stub();
+    flasher.connection().reset_after(is_stub, chip)?;
 
     Ok(())
 }
@@ -508,9 +517,8 @@ pub fn checksum_md5(args: &ChecksumMd5Args, config: &Config) -> Result<()> {
     println!("0x{checksum:032x}");
 
     let chip = flasher.chip();
-    flasher
-        .connection()
-        .reset_after(!args.connect_args.no_stub, chip)?;
+    let is_stub = flasher.uses_stub();
+    flasher.connection().reset_after(is_stub, chip)?;
 
     Ok(())
 }
@@ -917,9 +925,8 @@ pub fn erase_flash(args: EraseFlashArgs, config: &Config) -> Result<()> {
     let chip = flasher.chip();
 
     flasher.erase_flash()?;
-    flasher
-        .connection()
-        .reset_after(!args.connect_args.no_stub, chip)?;
+    let is_stub = flasher.uses_stub();
+    flasher.connection().reset_after(is_stub, chip)?;
 
     info!("Flash has been erased!");
 
@@ -951,9 +958,8 @@ pub fn erase_region(args: EraseRegionArgs, config: &Config) -> Result<()> {
     );
 
     flasher.erase_region(args.address, args.size)?;
-    flasher
-        .connection()
-        .reset_after(!args.connect_args.no_stub, chip)?;
+    let is_stub = flasher.uses_stub();
+    flasher.connection().reset_after(is_stub, chip)?;
 
     Ok(())
 }
@@ -1035,7 +1041,7 @@ pub fn read_flash(args: ReadFlashArgs, config: &Config) -> Result<()> {
     let mut flasher = connect(&args.connect_args, config, false, false)?;
     print_board_info(&mut flasher)?;
 
-    if args.connect_args.no_stub {
+    if !flasher.uses_stub() {
         flasher.read_flash_rom(
             args.address,
             args.size,
@@ -1054,9 +1060,8 @@ pub fn read_flash(args: ReadFlashArgs, config: &Config) -> Result<()> {
     }
 
     let chip = flasher.chip();
-    flasher
-        .connection()
-        .reset_after(!args.connect_args.no_stub, chip)?;
+    let is_stub = flasher.uses_stub();
+    flasher.connection().reset_after(is_stub, chip)?;
 
     Ok(())
 }

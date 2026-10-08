@@ -1,11 +1,15 @@
 //! Stub loader module.
 
-use std::time::Duration;
+use std::{fs, path::Path, time::Duration};
 
 use base64::{Engine as _, engine::general_purpose};
 use serde::{Deserialize, Serialize};
 
-use crate::target::Chip;
+use crate::{
+    Error,
+    resources::{self, ResourceKind},
+    target::Chip,
+};
 
 /// Flash stub object (deserialized from TOML, converted from JSON as used by
 /// `esptool.py`)
@@ -27,60 +31,80 @@ pub(crate) const CHIP_DETECT_MAGIC_REG_ADDR: u32 = 0x40001000;
 pub(crate) const DEFAULT_TIMEOUT: Duration = Duration::from_secs(3);
 pub(crate) const EXPECTED_STUB_HANDSHAKE: &str = "OHAI";
 
-// Include stub objects in binary
-const STUB_32: &str = include_str!("../../resources/stubs/esp32.toml");
-const STUB_32C2: &str = include_str!("../../resources/stubs/esp32c2.toml");
-const STUB_32C3: &str = include_str!("../../resources/stubs/esp32c3.toml");
-const STUB_32C5: &str = include_str!("../../resources/stubs/esp32c5.toml");
-const STUB_32C6: &str = include_str!("../../resources/stubs/esp32c6.toml");
-const STUB_32C61: &str = include_str!("../../resources/stubs/esp32c61.toml");
-const STUB_32H2: &str = include_str!("../../resources/stubs/esp32h2.toml");
-const STUB_32H4: &str = include_str!("../../resources/stubs/esp32h4.toml");
-const STUB_32P4: &str = include_str!("../../resources/stubs/esp32p4.toml");
-const STUB_32P4RC1: &str = include_str!("../../resources/stubs/esp32p4rc1.toml");
-const STUB_32S2: &str = include_str!("../../resources/stubs/esp32s2.toml");
-const STUB_32S3: &str = include_str!("../../resources/stubs/esp32s3.toml");
-const STUB_32S31: &str = include_str!("../../resources/stubs/esp32s31.toml");
-
 impl FlashStub {
-    /// Fetch flash stub for the provided chip
+    /// Fetch the bundled flash stub for the provided chip
+    #[cfg(feature = "bundled-resources")]
     #[allow(dead_code)]
     #[deprecated(note = "Use get_with_rev instead.")]
     pub fn get(chip: Chip) -> FlashStub {
         Self::get_with_rev(chip, None)
     }
 
-    /// Fetch flash stub for the provided chip and revision
+    /// Fetch the bundled flash stub for the provided chip and revision
     ///
     /// For ESP32-P4, if `revision` is provided and < 300, uses the RC1 stub.
     /// Otherwise uses the default stub for the chip.
+    #[cfg(feature = "bundled-resources")]
     pub fn get_with_rev(chip: Chip, revision: Option<u32>) -> FlashStub {
-        let s = match chip {
-            Chip::Esp32 => STUB_32,
-            Chip::Esp32c2 => STUB_32C2,
-            Chip::Esp32c3 => STUB_32C3,
-            Chip::Esp32c5 => STUB_32C5,
-            Chip::Esp32c6 => STUB_32C6,
-            Chip::Esp32c61 => STUB_32C61,
-            Chip::Esp32h2 => STUB_32H2,
-            Chip::Esp32h4 => STUB_32H4,
+        let s = resources::bundled(ResourceKind::Stub, Self::file_name(chip, revision)).unwrap();
+
+        Self::from_toml(std::str::from_utf8(s).unwrap()).unwrap()
+    }
+
+    /// Find the flash stub for the provided chip and revision, in the resource
+    /// directory or among the bundled stubs
+    ///
+    /// Returns `None` if no stub is available.
+    pub fn find(chip: Chip, revision: Option<u32>) -> Result<Option<FlashStub>, Error> {
+        let name = Self::file_name(chip, revision);
+        let Some(data) = resources::load(ResourceKind::Stub, name)? else {
+            return Ok(None);
+        };
+        let s =
+            std::str::from_utf8(&data).map_err(|e| Error::InvalidStub(format!("{name}: {e}")))?;
+
+        Self::from_toml(s)
+            .map(Some)
+            .map_err(|e| Error::InvalidStub(format!("{name}: {e}")))
+    }
+
+    /// Parse a flash stub from its TOML representation
+    pub fn from_toml(s: &str) -> Result<FlashStub, Error> {
+        toml::from_str(s).map_err(|e| Error::InvalidStub(e.to_string()))
+    }
+
+    /// Load a flash stub from a TOML file
+    pub fn from_file(path: &Path) -> Result<FlashStub, Error> {
+        let s = fs::read_to_string(path)
+            .map_err(|e| Error::FileOpenError(path.display().to_string(), e))?;
+
+        Self::from_toml(&s).map_err(|e| Error::InvalidStub(format!("{}: {e}", path.display())))
+    }
+
+    /// File name of the stub for the provided chip and revision
+    fn file_name(chip: Chip, revision: Option<u32>) -> &'static str {
+        match chip {
+            Chip::Esp32 => "esp32.toml",
+            Chip::Esp32c2 => "esp32c2.toml",
+            Chip::Esp32c3 => "esp32c3.toml",
+            Chip::Esp32c5 => "esp32c5.toml",
+            Chip::Esp32c6 => "esp32c6.toml",
+            Chip::Esp32c61 => "esp32c61.toml",
+            Chip::Esp32h2 => "esp32h2.toml",
+            Chip::Esp32h4 => "esp32h4.toml",
             Chip::Esp32p4 => {
                 // For ESP32-P4, use RC1 stub if revision < 300 (matching
                 // esptool behavior)
                 if revision.unwrap_or(300) < 300 {
-                    STUB_32P4RC1
+                    "esp32p4rc1.toml"
                 } else {
-                    STUB_32P4
+                    "esp32p4.toml"
                 }
             }
-            Chip::Esp32s2 => STUB_32S2,
-            Chip::Esp32s3 => STUB_32S3,
-            Chip::Esp32s31 => STUB_32S31,
-        };
-
-        let stub: FlashStub = toml::from_str(s).unwrap();
-
-        stub
+            Chip::Esp32s2 => "esp32s2.toml",
+            Chip::Esp32s3 => "esp32s3.toml",
+            Chip::Esp32s31 => "esp32s31.toml",
+        }
     }
 
     /// Fetch stub entry point
@@ -101,7 +125,7 @@ impl FlashStub {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "bundled-resources"))]
 mod tests {
     use strum::IntoEnumIterator;
 
