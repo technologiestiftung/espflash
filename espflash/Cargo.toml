@@ -41,7 +41,7 @@ ctrlc           = { version = "3.4", optional = true }
 defmt-decoder   = { version = "1.0", features = ["unstable"], optional = true }
 dialoguer       = { version = "0.12", optional = true }
 directories     = { version = "6.0", optional = true }
-env_logger      = { version = "0.11", optional = true }
+env_logger      = { version = "0.11", default-features = false, optional = true }
 esp-idf-part    = "0.6"
 esp-metadata-generated = { version = "0.5.1", features = ["build-script"] }
 flate2          = "1.1"
@@ -69,7 +69,7 @@ libc = "0.2.174"
 nix = { version = "0.31", features = ["signal", "time"] }
 
 [features]
-default = ["bundled-resources", "cli", "monitor", "panic-backtrace", "rom-elfs", "update-check"]
+default = ["bundled-resources", "cli", "monitor", "panic-backtrace", "pretty-logs", "rom-elfs", "update-check"]
 cli = [
     "dep:clap",
     "dep:clap_complete",
@@ -86,6 +86,9 @@ cli = [
 
 # Serial monitor, including backtrace and defmt decoding
 monitor = ["cli", "dep:addr2line", "dep:defmt-decoder", "dep:regex"]
+
+# Colored and timestamped log output, regular expressions in `RUST_LOG`
+pretty-logs = ["cli", "env_logger/default"]
 
 # Includes a backtrace in panic reports
 panic-backtrace = ["cli", "miette/fancy"]
