@@ -25,10 +25,12 @@ use std::{
 use clap::{Args, ValueEnum};
 #[cfg(feature = "completions")]
 use clap_complete::Shell;
+#[cfg(feature = "pretty-output")]
 use comfy_table::{Attribute, Cell, Color, Table, modifiers, presets::UTF8_FULL};
 use config::PortConfig;
 use esp_idf_part::{DataType, Partition, PartitionTable};
-use indicatif::{HumanCount, ProgressBar, style::ProgressStyle};
+#[cfg(feature = "pretty-output")]
+use indicatif::{ProgressBar, style::ProgressStyle};
 use log::{debug, info, warn};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::{Deserialize, Serialize};
@@ -847,22 +849,37 @@ pub(crate) fn display_image_size(app_size: u32, part_size: Option<u32>) {
         let percent = app_size as f32 / part_size as f32 * 100.0;
         println!(
             "App/part. size:    {}/{} bytes, {:.2}%",
-            HumanCount(app_size as u64),
-            HumanCount(part_size as u64),
+            human_count(app_size),
+            human_count(part_size),
             percent
         );
     } else {
-        println!("App size:          {} bytes", HumanCount(app_size as u64));
+        println!("App size:          {} bytes", human_count(app_size));
     }
 }
 
+/// Formats a number with thousands separators, e.g. `1,234,567`
+fn human_count(n: u32) -> String {
+    let digits = n.to_string();
+    let mut out = String::with_capacity(digits.len() + digits.len() / 3);
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    out
+}
+
 /// Progress callback implementations for use in `cargo-espflash` and `espflash`
+#[cfg(feature = "pretty-output")]
 #[derive(Debug, Default)]
 pub struct EspflashProgress {
     pb: Option<ProgressBar>,
     verifying: bool,
 }
 
+#[cfg(feature = "pretty-output")]
 impl ProgressCallbacks for EspflashProgress {
     /// Initialize the progress bar
     fn init(&mut self, addr: u32, len: usize) {
@@ -911,6 +928,43 @@ impl ProgressCallbacks for EspflashProgress {
             } else {
                 pb.finish();
             }
+        }
+        self.verifying = false;
+    }
+}
+
+/// Progress callback implementations for use in `cargo-espflash` and `espflash`
+///
+/// Prints plain progress messages instead of progress bars.
+#[cfg(not(feature = "pretty-output"))]
+#[derive(Debug, Default)]
+pub struct EspflashProgress {
+    addr: u32,
+    verifying: bool,
+}
+
+#[cfg(not(feature = "pretty-output"))]
+impl ProgressCallbacks for EspflashProgress {
+    fn init(&mut self, addr: u32, len: usize) {
+        self.addr = addr;
+        self.verifying = false;
+        println!("{addr:<#8X} Writing {} bytes...", human_count(len as u32));
+    }
+
+    fn update(&mut self, _current: usize) {}
+
+    fn verifying(&mut self) {
+        self.verifying = true;
+        println!("{:<#8X} Verifying...", self.addr);
+    }
+
+    fn finish(&mut self, skipped: bool) {
+        if skipped {
+            println!("{:<#8X} Skipped! (checksum matches)", self.addr);
+        } else if self.verifying {
+            println!("{:<#8X} OK!", self.addr);
+        } else {
+            println!("{:<#8X} Done", self.addr);
         }
         self.verifying = false;
     }
@@ -1116,6 +1170,7 @@ pub fn parse_partition_table(path: &Path) -> Result<PartitionTable, Error> {
 }
 
 /// Pretty print a partition table
+#[cfg(feature = "pretty-output")]
 fn pretty_print(table: PartitionTable) {
     let mut pretty = Table::new();
 
@@ -1162,6 +1217,49 @@ fn pretty_print(table: PartitionTable) {
     }
 
     println!("{pretty}");
+}
+
+#[cfg(not(feature = "pretty-output"))]
+fn pretty_print(table: PartitionTable) {
+    let header = ["Name", "Type", "SubType", "Offset", "Size", "Encrypted"].map(String::from);
+    let rows = table
+        .partitions()
+        .iter()
+        .map(|p| {
+            let flags = p
+                .flags()
+                .iter_names()
+                .map(|(name, _)| name.to_lowercase())
+                .collect::<Vec<_>>()
+                .join(":");
+
+            [
+                p.name(),
+                p.ty().to_string(),
+                p.subtype().to_string(),
+                format!("{:#x}", p.offset()),
+                format!("{:#x} ({}KiB)", p.size(), p.size() / 1024),
+                flags,
+            ]
+        })
+        .collect::<Vec<_>>();
+
+    let mut widths = header.each_ref().map(String::len);
+    for row in &rows {
+        for (width, cell) in widths.iter_mut().zip(row) {
+            *width = (*width).max(cell.len());
+        }
+    }
+
+    for row in std::iter::once(&header).chain(&rows) {
+        let line = row
+            .iter()
+            .zip(widths)
+            .map(|(cell, width)| format!("{cell:<width$}"))
+            .collect::<Vec<_>>()
+            .join("  ");
+        println!("{}", line.trim_end());
+    }
 }
 
 /// Make an image format from the given arguments
@@ -1404,5 +1502,15 @@ mod test {
         assert!(parse_u32("0xg").is_err());
         assert!(parse_u32("-123").is_err());
         assert!(parse_u32("12.34").is_err());
+    }
+
+    #[test]
+    fn test_human_count() {
+        assert_eq!(human_count(0), "0");
+        assert_eq!(human_count(999), "999");
+        assert_eq!(human_count(1000), "1,000");
+        assert_eq!(human_count(123456), "123,456");
+        assert_eq!(human_count(1234567), "1,234,567");
+        assert_eq!(human_count(u32::MAX), "4,294,967,295");
     }
 }

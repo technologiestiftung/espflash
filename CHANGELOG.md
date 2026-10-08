@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `completions` feature (enabled by default) to allow building the CLI without the `completions` subcommand and `clap_complete`
 - `pretty-errors` feature (enabled by default); without it, errors are printed in `miette`'s plain narratable format instead of graphical reports
 - `pretty-help` feature (enabled by default); without it, `clap` is built without colored and wrapped help output and without suggestions for mistyped arguments
+- `pretty-output` feature (enabled by default); without it, flashing progress and partition tables are printed as plain text instead of progress bars and colored tables
 
 ### Changed
 - Batching write for serial monitor input, to speed up text pasting, with writes timeout warning

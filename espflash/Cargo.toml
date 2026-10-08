@@ -69,16 +69,14 @@ libc = "0.2.174"
 nix = { version = "0.31", features = ["signal", "time"] }
 
 [features]
-default = ["bundled-resources", "cli", "completions", "monitor", "panic-backtrace", "pretty-errors", "pretty-help", "pretty-logs", "rom-elfs", "update-check"]
+default = ["bundled-resources", "cli", "completions", "monitor", "panic-backtrace", "pretty-errors", "pretty-help", "pretty-logs", "pretty-output", "rom-elfs", "update-check"]
 cli = [
     "dep:clap",
-    "dep:comfy-table",
     "dep:crossterm",
     "dep:ctrlc",
     "dep:dialoguer",
     "dep:directories",
     "dep:env_logger",
-    "dep:indicatif",
     "serialport",
 ]
 
@@ -90,6 +88,10 @@ monitor = ["cli", "dep:addr2line", "dep:defmt-decoder", "dep:regex"]
 
 # Colored and wrapped `--help` output, suggestions for mistyped arguments
 pretty-help = ["cli", "clap/color", "clap/suggestions", "clap/wrap_help"]
+
+# Progress bars and colored tables; without it, progress and tables are
+# printed as plain text
+pretty-output = ["cli", "dep:comfy-table", "dep:indicatif"]
 
 # Colored and timestamped log output, regular expressions in `RUST_LOG`
 pretty-logs = ["cli", "env_logger/default"]
