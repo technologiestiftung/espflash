@@ -62,12 +62,21 @@ pub mod logging {
 /// Check for updates
 #[cfg(feature = "cli")]
 pub mod update {
+    #[cfg(feature = "update-check")]
     use std::time::Duration;
 
+    #[cfg(feature = "update-check")]
     use log::info;
+    #[cfg(feature = "update-check")]
     use update_informer::{Check, registry::Crates};
 
+    /// Check for updates to the espflash crate (no-op without the
+    /// `update-check` feature).
+    #[cfg(not(feature = "update-check"))]
+    pub fn check_for_update(_name: &str, _version: &str) {}
+
     /// Check for updates to the espflash crate.
+    #[cfg(feature = "update-check")]
     pub fn check_for_update(name: &str, version: &str) {
         // By setting the interval to 0 seconds we invalidate the cache with
         // each invocation and ensure we're getting up-to-date results
