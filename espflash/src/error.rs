@@ -10,7 +10,7 @@ use slip_codec::SlipError;
 use strum::VariantNames;
 use thiserror::Error;
 
-#[cfg(feature = "cli")]
+#[cfg(feature = "monitor")]
 use crate::cli::monitor::parser::esp_defmt::DefmtError;
 #[cfg(feature = "serialport")]
 use crate::command::CommandType;
@@ -275,7 +275,7 @@ pub enum Error {
     MissingPartitionTable(#[source] CoreError),
 
     /// `defmt` error
-    #[cfg(feature = "cli")]
+    #[cfg(feature = "monitor")]
     #[error(transparent)]
     #[diagnostic(transparent)]
     Defmt(#[from] DefmtError),

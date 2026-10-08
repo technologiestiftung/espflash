@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Release binaries for `aarch64-unknown-linux-musl` (e.g. OpenWrt routers, Alpine on ARM)
 - `update-check` feature (enabled by default) to allow building the CLI without the crates.io update check and its HTTP/TLS dependencies
 - `rom-elfs` feature (enabled by default) to allow building without the embedded ROM ELFs; `monitor --rom-elf` can load one from disk instead
+- `monitor` feature (enabled by default) to allow building the CLI without the serial monitor and its backtrace/defmt decoding dependencies
 
 ### Changed
 - Batching write for serial monitor input, to speed up text pasting, with writes timeout warning

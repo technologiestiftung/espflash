@@ -1,14 +1,11 @@
 use std::{fs, path::PathBuf};
 
 use clap::{Args, CommandFactory, Parser, Subcommand};
+#[cfg(feature = "monitor")]
+use espflash::cli::monitor::{check_monitor_args, monitor};
 use espflash::{
     Error,
-    cli::{
-        self,
-        config::Config,
-        monitor::{check_monitor_args, monitor},
-        *,
-    },
+    cli::{self, config::Config, *},
     flasher::FlashSize,
     image_format::{ImageFormat, ImageFormatKind, Metadata, idf::check_idf_bootloader},
     logging::initialize_logger,
@@ -77,6 +74,7 @@ enum Commands {
     /// on development boards.
     ListPorts(ListPortsArgs),
     /// Open the serial monitor without flashing the connected target device
+    #[cfg(feature = "monitor")]
     Monitor(MonitorArgs),
     /// Convert partition tables between CSV and binary format
     ///
@@ -196,6 +194,7 @@ fn main() -> Result<()> {
         Commands::Flash(args) => flash(args, &config),
         Commands::HoldInReset(args) => hold_in_reset(args, &config),
         Commands::ListPorts(args) => list_ports(&args, &config.port_config),
+        #[cfg(feature = "monitor")]
         Commands::Monitor(args) => serial_monitor(args, &config),
         Commands::PartitionTable(args) => partition_table(args),
         Commands::ReadFlash(args) => read_flash(args, &config),
@@ -230,8 +229,13 @@ fn erase_parts(args: ErasePartsArgs, config: &Config) -> Result<()> {
 }
 
 fn flash(args: FlashArgs, config: &Config) -> Result<()> {
-    let mut monitor_args = args.flash_args.monitor_args;
-    monitor_args.elf = Some(args.image.clone());
+    #[cfg(feature = "monitor")]
+    let mut monitor_args = {
+        let mut monitor_args = args.flash_args.monitor_args;
+        monitor_args.elf = Some(args.image.clone());
+        monitor_args
+    };
+    #[cfg(feature = "monitor")]
     check_monitor_args(
         &args.flash_args.monitor,
         &monitor_args,
@@ -332,6 +336,7 @@ fn flash(args: FlashArgs, config: &Config) -> Result<()> {
         flash_image(&mut flasher, image_format)?;
     }
 
+    #[cfg(feature = "monitor")]
     if args.flash_args.monitor {
         let pid = flasher.connection().usb_pid();
 
@@ -347,10 +352,10 @@ fn flash(args: FlashArgs, config: &Config) -> Result<()> {
             pid,
             monitor_args,
             args.connect_args.non_interactive,
-        )
-    } else {
-        Ok(())
+        )?;
     }
+
+    Ok(())
 }
 
 fn save_image(args: SaveImageArgs, config: &Config) -> Result<()> {

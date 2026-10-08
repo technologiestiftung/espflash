@@ -12,8 +12,9 @@
 
 #![allow(missing_docs)]
 
+#[cfg(feature = "monitor")]
+use std::borrow::Cow;
 use std::{
-    borrow::Cow,
     collections::HashMap,
     fs::{self, File},
     io::{Read, Write},
@@ -32,10 +33,9 @@ use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::{Deserialize, Serialize};
 use serialport::{FlowControl, SerialPortInfo, SerialPortType, UsbPortInfo};
 
-use self::{
-    config::Config,
-    monitor::{LogFormat, UnwindTables, check_monitor_args, monitor},
-};
+use self::config::Config;
+#[cfg(feature = "monitor")]
+use self::monitor::{LogFormat, UnwindTables, check_monitor_args, monitor};
 use crate::{
     connection::{
         Connection,
@@ -57,6 +57,7 @@ use crate::{
 };
 
 pub mod config;
+#[cfg(feature = "monitor")]
 pub mod monitor;
 
 mod serial;
@@ -152,9 +153,11 @@ pub struct FlashConfigArgs {
 #[group(skip)]
 pub struct FlashArgs {
     /// Open a serial monitor after flashing
+    #[cfg(feature = "monitor")]
     #[arg(short = 'M', long)]
     pub monitor: bool,
     /// Monitor configuration
+    #[cfg(feature = "monitor")]
     #[clap(flatten)]
     pub monitor_args: MonitorConfigArgs,
     /// Load the application to RAM instead of Flash
@@ -284,6 +287,7 @@ pub struct IdfFormatArgs {
 }
 
 /// Arguments for connection and monitoring
+#[cfg(feature = "monitor")]
 #[derive(Debug, Args)]
 #[non_exhaustive]
 pub struct MonitorArgs {
@@ -296,6 +300,7 @@ pub struct MonitorArgs {
 }
 
 /// Open the serial monitor without flashing
+#[cfg(feature = "monitor")]
 #[derive(Debug, Args)]
 #[non_exhaustive]
 pub struct MonitorConfigArgs {
@@ -381,9 +386,11 @@ pub struct WriteBinArgs {
     #[clap(flatten)]
     connect_args: ConnectArgs,
     /// Open a serial monitor after writing
+    #[cfg(feature = "monitor")]
     #[arg(short = 'M', long)]
     pub monitor: bool,
     /// Serial monitor configuration
+    #[cfg(feature = "monitor")]
     #[clap(flatten)]
     pub monitor_args: MonitorConfigArgs,
 }
@@ -643,17 +650,20 @@ pub fn print_board_info(flasher: &mut Flasher) -> Result<DeviceInfo> {
     Ok(info)
 }
 
+#[cfg(feature = "monitor")]
 #[derive(Debug)]
 pub struct MonitorElfs<'a> {
     elfs: Vec<Cow<'a, [u8]>>,
 }
 
+#[cfg(feature = "monitor")]
 impl<'a> MonitorElfs<'a> {
     pub fn refs(&self) -> Vec<&[u8]> {
         self.elfs.iter().map(|elf| elf.as_ref()).collect()
     }
 }
 
+#[cfg(feature = "monitor")]
 pub fn preprocess_monitor_args(
     chip: Chip,
     xtal_frequency: XtalFrequency,
@@ -669,6 +679,7 @@ pub fn preprocess_monitor_args(
     }
 }
 
+#[cfg(feature = "monitor")]
 pub fn load_monitor_elfs<'a>(
     firmware_elf: Option<&'a [u8]>,
     monitor_args: &MonitorConfigArgs,
@@ -690,6 +701,7 @@ pub fn load_monitor_elfs<'a>(
 }
 
 /// Open a serial monitor
+#[cfg(feature = "monitor")]
 pub fn serial_monitor(args: MonitorArgs, config: &Config) -> Result<()> {
     let mut flasher = connect(&args.connect_args, config, true, true)?;
     let pid = flasher.connection().usb_pid();
@@ -1248,6 +1260,7 @@ pub fn make_flash_data(
 /// Write a binary to the flash memory of a target device
 pub fn write_bin(args: WriteBinArgs, config: &Config) -> Result<()> {
     // Check monitor arguments
+    #[cfg(feature = "monitor")]
     check_monitor_args(
         &args.monitor,
         &args.monitor_args,
@@ -1262,13 +1275,17 @@ pub fn write_bin(args: WriteBinArgs, config: &Config) -> Result<()> {
     f.read_to_end(&mut buffer).into_diagnostic()?;
 
     let mut flasher = connect(&args.connect_args, config, false, false)?;
+    #[cfg_attr(not(feature = "monitor"), allow(unused_variables))]
     let dev_info = print_board_info(&mut flasher)?;
 
+    #[cfg(feature = "monitor")]
     let chip = flasher.chip();
+    #[cfg(feature = "monitor")]
     let target_xtal_freq = chip.xtal_frequency(flasher.connection())?;
 
     flasher.write_bin_to_flash(args.address, &buffer, &mut EspflashProgress::default())?;
 
+    #[cfg(feature = "monitor")]
     if args.monitor {
         let pid = flasher.connection().usb_pid();
         let mut monitor_args = args.monitor_args;
