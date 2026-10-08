@@ -163,6 +163,7 @@ struct SaveImageArgs {
 }
 
 fn main() -> Result<()> {
+    #[cfg(feature = "panic-backtrace")]
     miette::set_panic_hook();
     initialize_logger(LevelFilter::Info);
 

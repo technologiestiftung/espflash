@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `rom-elfs` feature (enabled by default) to allow building without the embedded ROM ELFs; `monitor --rom-elf` can load one from disk instead
 - `monitor` feature (enabled by default) to allow building the CLI without the serial monitor and its backtrace/defmt decoding dependencies
 - `bundled-resources` feature (enabled by default); bootloaders and flasher stubs can be loaded from the directory named by `ESPFLASH_RESOURCE_DIR` (runtime or build time), and a stub can be given with `--stub`. Without a stub, `espflash` falls back to the ROM loader
+- `panic-backtrace` feature (enabled by default); without it, `miette` is built without backtrace support and panics use the standard Rust panic message
 
 ### Changed
 - Batching write for serial monitor input, to speed up text pasting, with writes timeout warning
